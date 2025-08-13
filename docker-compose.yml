@@ -1,0 +1,18 @@
+services:
+  frontend:
+    platform: linux/arm64
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: appointment-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      HOST: "0.0.0.0"
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+    networks:
+      - mern
+
+networks:
+  mern:
+    driver: bridge
