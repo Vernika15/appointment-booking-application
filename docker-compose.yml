@@ -13,6 +13,19 @@ services:
     networks:
       - mern
 
+  backend:
+    platform: linux/arm64
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    container_name: appointment-backend
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8081:8081"
+    networks:
+      - mern
+
 networks:
   mern:
     driver: bridge
