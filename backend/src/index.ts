@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db";
 import appointmentRoutes from "./routes/appointmentRoutes";
@@ -8,6 +9,13 @@ dotenv.config();
 
 // Create an instance of the Express application
 const app = express();
+const allowedOrigins = ["http://localhost:5173", "http://localhost:8081"];
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
 
 // Define the server port from environment or fallback to 8081
 const PORT = process.env.PORT || 8081;
