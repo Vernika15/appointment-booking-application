@@ -14,7 +14,7 @@ A full-stack appointment booking app with a React + TypeScript frontend and a RE
 
 ---
 
-## Monorepo Layout
+## Repo Layout
 
 ```
 .
