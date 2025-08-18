@@ -1,99 +1,153 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import type { PropsWithChildren } from "react";
 import type { Appointment } from "../types";
-import { loadAppointments, saveAppointments } from "../utils/localStorage";
-import { doctors } from "../data/doctors";
+import {
+  createAppointment as apiCreateAppointment,
+  fetchAppointments as apiFetchAppointments,
+  updateAppointmentById as apiUpdateAppointment,
+  deleteAppointmentById as apiDeleteAppointment,
+} from "../services/appointments";
+import { ALL_SLOTS } from "../data/doctors";
 import { AppointmentContext } from "./AppointmentContext";
 
-/**
- * AppointmentProvider component wraps the application with context state and functions
- * related to appointment management. It handles all CRUD operations and slot availability logic.
- *
- * @param {Object} props
- * @param {React.ReactNode} props.children - The child components to be wrapped with context.
- * @returns {JSX.Element} Provider component with appointment-related state and handlers.
- */
-export const AppointmentProvider: React.FC<{ children: React.ReactNode }> = ({
+export type AppointmentsCtx = {
+  appointments: Appointment[];
+  addAppointment: (a: Omit<Appointment, "id">) => Promise<void>;
+  editAppointment: (id: string, patch: Partial<Appointment>) => Promise<void>;
+  deleteAppointment: (id: string) => Promise<void>;
+  getAvailableSlots: (doctorName: string, date: string) => string[];
+  initialLoading: boolean;
+  loading: boolean;
+  error: string | null;
+};
+
+// export const AppointmentContext = createContext<AppointmentsCtx | null>(null);
+
+export const AppointmentProvider: React.FC<PropsWithChildren> = ({
   children,
 }) => {
-  const [appointments, setAppointments] = useState<Appointment[]>(
-    loadAppointments()
-  );
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [selectedAppointment, setSelectedAppointment] =
-    useState<Appointment | null>(null);
-
-  // Load appointments from localStorage on initial render
   useEffect(() => {
-    setAppointments(loadAppointments());
+    (async () => {
+      try {
+        setError(null);
+        setInitialLoading(true);
+        const list = await apiFetchAppointments();
+        setAppointments(list);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg || "Failed to load appointments");
+      } finally {
+        setInitialLoading(false);
+      }
+    })();
   }, []);
 
-  // Persist appointments to localStorage whenever they change
-  useEffect(() => {
-    saveAppointments(appointments);
-  }, [appointments]);
-
-  /**
-   * Adds a new appointment and saves to localStorage
-   * @param {Appointment} appointment - Appointment to be added
-   */
-  const addAppointment = (appointment: Appointment) => {
-    const updated = [...appointments, appointment];
-    setAppointments(updated);
-    saveAppointments(updated);
-  };
-
-  /**
-   * Updates an existing appointment and saves to localStorage
-   * @param {Appointment} updatedAppt - Updated appointment object
-   */
-  const updateAppointment = (updatedAppt: Appointment) => {
-    const updated = appointments.map((a) =>
-      a.id === updatedAppt.id ? updatedAppt : a
+  const getAvailableSlots: AppointmentsCtx["getAvailableSlots"] = (
+    doctorName,
+    date
+  ) => {
+    if (!doctorName || !date) return [];
+    const booked = new Set(
+      appointments
+        .filter((a) => a.doctorName === doctorName && a.date === date)
+        .map((a) => a.slot)
     );
-    setAppointments(updated);
-    saveAppointments(updated);
+    return ALL_SLOTS.filter((s) => !booked.has(s));
   };
 
-  /**
-   * Deletes an appointment by ID and saves to localStorage
-   * @param {string} id - ID of the appointment to delete
-   */
-  const deleteAppointment = (id: string) => {
-    const updated = appointments.filter((a) => a.id !== id);
-    setAppointments(updated);
-    saveAppointments(updated);
+  const addAppointment: AppointmentsCtx["addAppointment"] = async (a) => {
+    setError(null);
+    setLoading(true);
+    try {
+      const created = await apiCreateAppointment({
+        name: a.name,
+        doctorId: a.doctorId,
+        doctorName: a.doctorName,
+        date: a.date,
+        slot: a.slot,
+        purpose: a.purpose,
+      });
+      setAppointments((prev) => [created, ...prev]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg || "Failed to create appointment");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  /**
-   * Returns available time slots for a doctor on a specific date
-   * @param {string} doctorId - ID of the selected doctor
-   * @param {string} date - Selected date
-   * @returns {string[]} Array of available slot strings
-   */
-  const getAvailableSlots = (doctorId: string, date: string): string[] => {
-    const doctor = doctors.find((d) => d.id === doctorId);
-    if (!doctor) return [];
+  const editAppointment = async (id: string, patch: Partial<Appointment>) => {
+    setError(null);
+    setLoading(true);
+    try {
+      // merge with existing so required fields are always present
+      const existing = appointments.find((a) => a.id === id);
+      if (!existing) throw new Error("Appointment not found");
 
-    const bookedSlots = appointments
-      .filter((appt) => appt.doctorId === doctorId && appt.date === date)
-      .map((appt) => appt.slot);
+      const payload = {
+        name: patch.name ?? existing.name,
+        doctorId: patch.doctorId ?? existing.doctorId,
+        doctorName: patch.doctorName ?? existing.doctorName,
+        date: patch.date ?? existing.date,
+        slot: patch.slot ?? existing.slot,
+        purpose: patch.purpose ?? existing.purpose,
+      };
 
-    return doctor.availableSlots.filter((slot) => !bookedSlots.includes(slot));
+      const updated = await apiUpdateAppointment(id, payload);
+      setAppointments((prev) => prev.map((x) => (x.id === id ? updated : x)));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg || "Failed to update appointment");
+      throw e;
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const deleteAppointment = async (id: string) => {
+    setError(null);
+    try {
+      await apiDeleteAppointment(id);
+      setAppointments((prev) => prev.filter((x) => x.id !== id));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg || "Failed to delete appointment");
+      throw e;
+    }
+  };
+
+  const value = useMemo<AppointmentsCtx>(
+    () => ({
+      appointments,
+      addAppointment,
+      editAppointment,
+      deleteAppointment,
+      getAvailableSlots,
+      initialLoading,
+      loading,
+      error,
+    }),
+    [appointments, initialLoading, loading, error]
+  );
 
   return (
-    <AppointmentContext.Provider
-      value={{
-        appointments,
-        selectedAppointment,
-        addAppointment,
-        updateAppointment,
-        deleteAppointment,
-        setSelectedAppointment,
-        getAvailableSlots,
-      }}
-    >
+    <AppointmentContext.Provider value={value}>
       {children}
     </AppointmentContext.Provider>
   );
 };
+
+// export function useAppointmentsFromProvider() {
+//   const ctx = useContext(AppointmentContext);
+//   if (!ctx)
+//     throw new Error(
+//       "useAppointments must be used within an AppointmentProvider"
+//     );
+//   return ctx;
+// }

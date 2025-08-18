@@ -21,7 +21,26 @@ type Props = {
  * @returns JSX.Element
  */
 export const AppointmentsTable: React.FC<Props> = ({ onEdit }) => {
-  const { appointments, deleteAppointment } = useAppointments();
+  const { appointments, deleteAppointment, initialLoading, error } =
+    useAppointments();
+
+  if (initialLoading) {
+    return (
+      <div className="table-container">
+        <h3>📅 Appointments Table</h3>
+        <p>Loading appointments…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="table-container">
+        <h3>📅 Appointments Table</h3>
+        <p style={{ color: "crimson" }}>{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="table-container">

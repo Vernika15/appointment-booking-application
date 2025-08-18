@@ -23,7 +23,7 @@ export type Appointment = {
   name: string;
 
   /** ID of the selected doctor */
-  doctorId: string;
+  doctorId?: string;
 
   /** Name of the selected doctor (for display) */
   doctorName: string;
@@ -78,5 +78,5 @@ export type AppointmentContextType = {
    * @param date - Date to check (in YYYY-MM-DD format)
    * @returns Array of available time slots
    */
-  getAvailableSlots: (doctorId: string, date: string) => string[];
+  getAvailableSlots: (doctorName: string, date: string) => string[];
 };

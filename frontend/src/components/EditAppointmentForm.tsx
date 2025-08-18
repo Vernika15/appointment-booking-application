@@ -1,7 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAppointments } from "../hooks/useAppointments";
 import { doctors } from "../data/doctors";
 import type { Appointment } from "../types";
+
+function findDoctorByName(name: string | undefined) {
+  if (!name) return undefined;
+  const n = name.trim().toLowerCase();
+  return doctors.find((d) => d.name.trim().toLowerCase() === n);
+}
 
 /**
  * Props for the EditAppointmentForm component
@@ -24,14 +30,16 @@ export const EditAppointmentForm: React.FC<Props> = ({
   appointment,
   onClose,
 }) => {
-  const { updateAppointment, getAvailableSlots } = useAppointments();
+  const { editAppointment, getAvailableSlots, loading, error } =
+    useAppointments();
 
   const [name, setName] = useState("");
+  const [doctorName, setDoctorName] = useState("");
   const [date, setDate] = useState("");
-  const [doctorId, setDoctorId] = useState("");
+  const [doctorId, setDoctorId] = useState<string | undefined>(undefined);
   const [slot, setSlot] = useState("");
   const [purpose, setPurpose] = useState("");
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   /**
    * Prefill the form fields when a new appointment is passed in
@@ -39,64 +47,72 @@ export const EditAppointmentForm: React.FC<Props> = ({
   useEffect(() => {
     if (appointment) {
       setName(appointment.name);
+      setDoctorName(appointment.doctorName);
       setDate(appointment.date);
-      setDoctorId(appointment.doctorId);
       setSlot(appointment.slot);
       setPurpose(appointment.purpose);
+
+      if (appointment.doctorId) {
+        setDoctorId(appointment.doctorId);
+      } else {
+        const match = findDoctorByName(appointment.doctorName);
+        setDoctorId(match?.id);
+      }
     }
   }, [appointment]);
 
-  /**
-   * Load available slots when doctor or date changes.
-   * Also ensures that the original slot remains available when editing.
-   */
-  useEffect(() => {
-    if (doctorId && date) {
-      const slots = getAvailableSlots(doctorId, date);
+  const baseSlots = useMemo(
+    () => (doctorName && date ? getAvailableSlots(doctorName, date) : []),
+    [doctorName, date, getAvailableSlots]
+  );
 
-      // Include current slot back in case it's already booked
-      if (
-        appointment?.slot &&
-        appointment.doctorId === doctorId &&
-        appointment.date === date
-      ) {
-        slots.push(appointment.slot);
-        slots.sort();
-      }
-
-      setAvailableSlots(slots);
-    } else {
-      setAvailableSlots([]);
+  const slotsToShow = useMemo(() => {
+    let list = baseSlots;
+    if (
+      appointment.doctorName === doctorName &&
+      appointment.date === date &&
+      appointment.slot &&
+      !list.includes(appointment.slot)
+    ) {
+      list = [appointment.slot, ...list];
     }
-  }, [doctorId, date, appointment]);
+    return list;
+  }, [baseSlots, appointment, doctorName, date]);
 
-  /**
-   * Handles the update submission of the form
-   * @param e - Form event
-   */
-  const handleSubmit = (e: React.FormEvent) => {
+  const isValid =
+    name.trim() &&
+    doctorName.trim() &&
+    date.trim() &&
+    slot.trim() &&
+    purpose.trim();
+
+  const handleUpdate = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    if (!appointment) return;
+    setSubmitError(null);
 
-    const doctor = doctors.find((d) => d.id === doctorId);
-    if (!doctor) return;
+    if (!isValid) {
+      setSubmitError("Please fill all fields.");
+      return;
+    }
 
-    const updated = {
-      ...appointment,
-      name,
-      date,
-      doctorId,
-      doctorName: doctor.name,
-      slot,
-      purpose,
-    };
-
-    updateAppointment(updated);
-    onClose(); // close modal after update
+    try {
+      await editAppointment(appointment.id, {
+        name,
+        doctorName,
+        doctorId,
+        date,
+        slot,
+        purpose,
+      });
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSubmitError(msg || "Failed to update appointment");
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="form-container">
+    <form className="form-container">
       <h3>✏️ Edit Appointment</h3>
 
       <label>
@@ -113,7 +129,10 @@ export const EditAppointmentForm: React.FC<Props> = ({
         <input
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) => {
+            setDate(e.target.value);
+            setSlot("");
+          }}
           required
         />
       </label>
@@ -121,8 +140,14 @@ export const EditAppointmentForm: React.FC<Props> = ({
       <label>
         Doctor:
         <select
-          value={doctorId}
-          onChange={(e) => setDoctorId(e.target.value)}
+          value={doctorId ?? ""}
+          onChange={(e) => {
+            const id = e.target.value || undefined;
+            setDoctorId(id);
+            const doc = doctors.find((d) => d.id === id);
+            setDoctorName(doc?.name ?? "");
+            setSlot("");
+          }}
           required
         >
           <option value="">-- Select Doctor --</option>
@@ -136,14 +161,9 @@ export const EditAppointmentForm: React.FC<Props> = ({
 
       <label>
         Slot:
-        <select
-          value={slot}
-          onChange={(e) => setSlot(e.target.value)}
-          required
-          disabled={!doctorId || !date}
-        >
+        <select value={slot} onChange={(e) => setSlot(e.target.value)} required>
           <option value="">-- Select Doctor & Date First --</option>
-          {availableSlots.map((s) => (
+          {slotsToShow.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
@@ -160,7 +180,13 @@ export const EditAppointmentForm: React.FC<Props> = ({
         />
       </label>
 
-      <button type="submit">Update Appointment</button>
+      {(submitError || error) && (
+        <p style={{ color: "crimson", marginTop: 8 }}>{submitError || error}</p>
+      )}
+
+      <button type="button" onClick={handleUpdate}>
+        {loading ? "Updating…" : "Update Appointment"}
+      </button>
     </form>
   );
 };

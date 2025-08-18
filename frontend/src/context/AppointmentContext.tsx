@@ -1,5 +1,16 @@
 import { createContext } from "react";
-import type { AppointmentContextType } from "../types";
+import type { Appointment } from "../types";
+
+type AppointmentsCtx = {
+  appointments: Appointment[];
+  addAppointment: (a: Omit<Appointment, "id">) => Promise<void>;
+  editAppointment: (id: string, patch: Partial<Appointment>) => Promise<void>;
+  deleteAppointment: (id: string) => Promise<void>;
+  getAvailableSlots: (doctorName: string, date: string) => string[];
+  initialLoading: boolean;
+  loading: boolean;
+  error: string | null;
+};
 
 /**
  * React Context to manage global appointment-related state and actions.
@@ -14,6 +25,4 @@ import type { AppointmentContextType } from "../types";
  * It should be consumed using the `useAppointments` hook and must be
  * wrapped inside `AppointmentProvider`.
  */
-export const AppointmentContext = createContext<AppointmentContextType | null>(
-  null
-);
+export const AppointmentContext = createContext<AppointmentsCtx | null>(null);

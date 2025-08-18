@@ -1,6 +1,5 @@
 import { useContext } from "react";
 import { AppointmentContext } from "../context/AppointmentContext";
-import type { AppointmentContextType } from "../types";
 
 /**
  * Custom hook to access the Appointment context.
@@ -11,10 +10,12 @@ import type { AppointmentContextType } from "../types";
  * @example
  * const { appointments, addAppointment } = useAppointments();
  */
-export const useAppointments = (): AppointmentContextType => {
+export function useAppointments() {
   const context = useContext(AppointmentContext);
   if (!context) {
-    throw new Error("useAppointments must be used within AppointmentProvider");
+    throw new Error(
+      "useAppointments must be used within an AppointmentProvider"
+    );
   }
   return context;
-};
+}

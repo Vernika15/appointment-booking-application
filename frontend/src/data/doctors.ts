@@ -3,7 +3,7 @@ import type { Doctor } from "../types";
 /**
  * A constant array of all possible time slots available for appointments.
  */
-export const ALL_SLOTS = [
+export const ALL_SLOTS: string[] = [
   "09:00 AM",
   "10:00 AM",
   "11:00 AM",

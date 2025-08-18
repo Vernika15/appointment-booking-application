@@ -50,7 +50,7 @@ function App() {
 
         <div className="bottom-section">
           <div className="left-panel">
-            <AppointmentForm />
+            <AppointmentForm selectedAppointment={null} />
           </div>
           <div className="right-panel">
             <AppointmentsTable onEdit={handleEdit} />
