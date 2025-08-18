@@ -21,16 +21,25 @@ export type AppointmentsCtx = {
   error: string | null;
 };
 
-// export const AppointmentContext = createContext<AppointmentsCtx | null>(null);
-
+/**
+ * Provides appointment state/actions to all descendants.
+ */
 export const AppointmentProvider: React.FC<PropsWithChildren> = ({
   children,
 }) => {
+  // ---- State ----------------------------------------------------------------
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  /** Loading flag for the initial GET on mount (table skeleton/loading state). */
   const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  /** Loading flag for mutations (create/update). Keep separate from initialLoading. */
   const [loading, setLoading] = useState<boolean>(false);
+  /** Last error message (read list or mutation). */
   const [error, setError] = useState<string | null>(null);
 
+  // ---- Effects ---------------------------------------------------------------
+  /**
+   * On mount, fetch the appointment list from the server.
+   */
   useEffect(() => {
     (async () => {
       try {
@@ -47,6 +56,15 @@ export const AppointmentProvider: React.FC<PropsWithChildren> = ({
     })();
   }, []);
 
+  // ---- Derived helpers -------------------------------------------------------
+  /**
+   * Compute available time slots for a given doctor and date.
+   * Returns an empty list until both doctor and date are picked (UX parity).
+   *
+   * @param doctorName - Human-readable doctor name (e.g., "Dr. A.P.J. Abdul")
+   * @param date - ISO date string (YYYY-MM-DD)
+   * @returns array of available slot labels (e.g., ["09:00 AM", "09:30 AM"])
+   */
   const getAvailableSlots: AppointmentsCtx["getAvailableSlots"] = (
     doctorName,
     date
@@ -60,6 +78,11 @@ export const AppointmentProvider: React.FC<PropsWithChildren> = ({
     return ALL_SLOTS.filter((s) => !booked.has(s));
   };
 
+  // ---- Actions ---------------------------------------------------------------
+  /**
+   * Create a new appointment (POST /api/appointments).
+   * Prepends the created record to the list on success.
+   */
   const addAppointment: AppointmentsCtx["addAppointment"] = async (a) => {
     setError(null);
     setLoading(true);
@@ -82,6 +105,10 @@ export const AppointmentProvider: React.FC<PropsWithChildren> = ({
     }
   };
 
+  /**
+   * Update an existing appointment (PUT /api/appointments/:id).
+   * Merges the incoming patch with the existing record to build a complete payload.
+   */
   const editAppointment = async (id: string, patch: Partial<Appointment>) => {
     setError(null);
     setLoading(true);
@@ -110,6 +137,9 @@ export const AppointmentProvider: React.FC<PropsWithChildren> = ({
     }
   };
 
+  /**
+   * Delete an appointment (DELETE /api/appointments/:id) and update state.
+   */
   const deleteAppointment = async (id: string) => {
     setError(null);
     try {
@@ -122,6 +152,7 @@ export const AppointmentProvider: React.FC<PropsWithChildren> = ({
     }
   };
 
+  // ---- Context value ---------------------------------------------------------
   const value = useMemo<AppointmentsCtx>(
     () => ({
       appointments,

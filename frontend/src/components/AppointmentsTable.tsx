@@ -21,9 +21,11 @@ type Props = {
  * @returns JSX.Element
  */
 export const AppointmentsTable: React.FC<Props> = ({ onEdit }) => {
+  // Pull server-backed state & actions from context
   const { appointments, deleteAppointment, initialLoading, error } =
     useAppointments();
 
+  // Loading state while initial GET /api/appointments is in-flight
   if (initialLoading) {
     return (
       <div className="table-container">
@@ -33,6 +35,7 @@ export const AppointmentsTable: React.FC<Props> = ({ onEdit }) => {
     );
   }
 
+  // Render a simple error banner if the list fetch failed
   if (error) {
     return (
       <div className="table-container">

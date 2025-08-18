@@ -20,31 +20,25 @@ export const doctors: Doctor[] = [
   {
     id: "1",
     name: "Dr. A.P.J. Abdul",
-    availableSlots: [...ALL_SLOTS],
   },
   {
     id: "2",
     name: "Dr. Maya Rao",
-    availableSlots: [...ALL_SLOTS],
   },
   {
     id: "3",
     name: "Dr. Vikram Patel",
-    availableSlots: [...ALL_SLOTS],
   },
   {
     id: "4",
     name: "Dr. In Ho",
-    availableSlots: [...ALL_SLOTS],
   },
   {
     id: "5",
     name: "Dr. Deepak Verma",
-    availableSlots: [...ALL_SLOTS],
   },
   {
     id: "6",
     name: "Dr. Prem Chand",
-    availableSlots: [...ALL_SLOTS],
   },
 ];

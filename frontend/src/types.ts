@@ -7,9 +7,6 @@ export type Doctor = {
 
   /** Full name of the doctor */
   name: string;
-
-  /** Time slots that the doctor is available for appointments */
-  availableSlots: string[];
 };
 
 /**

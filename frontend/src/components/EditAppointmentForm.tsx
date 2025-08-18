@@ -3,6 +3,12 @@ import { useAppointments } from "../hooks/useAppointments";
 import { doctors } from "../data/doctors";
 import type { Appointment } from "../types";
 
+/**
+ * Find a doctor object by a case-insensitive name match.
+ *
+ * @param name - Doctor name to search for
+ * @returns The matching doctor from the static list, or undefined if not found
+ */
 function findDoctorByName(name: string | undefined) {
   if (!name) return undefined;
   const n = name.trim().toLowerCase();
@@ -33,16 +39,17 @@ export const EditAppointmentForm: React.FC<Props> = ({
   const { editAppointment, getAvailableSlots, loading, error } =
     useAppointments();
 
-  const [name, setName] = useState("");
-  const [doctorName, setDoctorName] = useState("");
-  const [date, setDate] = useState("");
+  const [name, setName] = useState<string>("");
+  const [doctorName, setDoctorName] = useState<string>("");
+  const [date, setDate] = useState<string>("");
   const [doctorId, setDoctorId] = useState<string | undefined>(undefined);
-  const [slot, setSlot] = useState("");
-  const [purpose, setPurpose] = useState("");
+  const [slot, setSlot] = useState<string>("");
+  const [purpose, setPurpose] = useState<string>("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   /**
-   * Prefill the form fields when a new appointment is passed in
+   * Prefill the form fields when `appointment` changes (e.g., user opens a different row).
+   * If doctorId is missing on the record, derive it from the doctorName so the <select> reflects the current doctor.
    */
   useEffect(() => {
     if (appointment) {
@@ -61,12 +68,21 @@ export const EditAppointmentForm: React.FC<Props> = ({
     }
   }, [appointment]);
 
-  const baseSlots = useMemo(
+  /**
+   * Base available slots for the current (doctorName, date) pair.
+   * - Returns [] until both doctor and date are chosen (UX rule).
+   * - Excludes already-booked slots for the same doctor & date.
+   */
+  const baseSlots = useMemo<string[]>(
     () => (doctorName && date ? getAvailableSlots(doctorName, date) : []),
     [doctorName, date, getAvailableSlots]
   );
 
-  const slotsToShow = useMemo(() => {
+  /**
+   * Slots to show in the dropdown.
+   * - Keeps the currently selected slot visible (when editing) even if otherwise filtered out.
+   */
+  const slotsToShow = useMemo<string[]>(() => {
     let list = baseSlots;
     if (
       appointment.doctorName === doctorName &&
@@ -79,13 +95,20 @@ export const EditAppointmentForm: React.FC<Props> = ({
     return list;
   }, [baseSlots, appointment, doctorName, date]);
 
-  const isValid =
+  /** Simple required-fields check for enabling the submit and guarding submit handler. */
+  const isValid: boolean = Boolean(
     name.trim() &&
-    doctorName.trim() &&
-    date.trim() &&
-    slot.trim() &&
-    purpose.trim();
+      doctorName.trim() &&
+      date.trim() &&
+      slot.trim() &&
+      purpose.trim()
+  );
 
+  /**
+   * Submit handler that calls the PUT endpoint via context's `editAppointment`.
+   *
+   * @param e - Button click event
+   */
   const handleUpdate = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setSubmitError(null);
@@ -115,6 +138,7 @@ export const EditAppointmentForm: React.FC<Props> = ({
     <form className="form-container">
       <h3>✏️ Edit Appointment</h3>
 
+      {/* Name */}
       <label>
         Name:
         <input
@@ -124,6 +148,7 @@ export const EditAppointmentForm: React.FC<Props> = ({
         />
       </label>
 
+      {/* Date (reset slot on change to respect availability rules) */}
       <label>
         Date:
         <input
@@ -131,12 +156,13 @@ export const EditAppointmentForm: React.FC<Props> = ({
           value={date}
           onChange={(e) => {
             setDate(e.target.value);
-            setSlot("");
+            setSlot(""); // previously chosen slot may no longer be available
           }}
           required
         />
       </label>
 
+      {/* Doctor select: keep doctorId and doctorName in sync; reset slot on change */}
       <label>
         Doctor:
         <select
@@ -146,7 +172,7 @@ export const EditAppointmentForm: React.FC<Props> = ({
             setDoctorId(id);
             const doc = doctors.find((d) => d.id === id);
             setDoctorName(doc?.name ?? "");
-            setSlot("");
+            setSlot(""); // reset slot when doctor changes
           }}
           required
         >
@@ -159,6 +185,7 @@ export const EditAppointmentForm: React.FC<Props> = ({
         </select>
       </label>
 
+      {/* Slot (only after doctor & date; preserves current slot visibility) */}
       <label>
         Slot:
         <select value={slot} onChange={(e) => setSlot(e.target.value)} required>
@@ -171,6 +198,7 @@ export const EditAppointmentForm: React.FC<Props> = ({
         </select>
       </label>
 
+      {/* Purpose / notes */}
       <label>
         Purpose:
         <textarea
@@ -180,6 +208,7 @@ export const EditAppointmentForm: React.FC<Props> = ({
         />
       </label>
 
+      {/* Inline error from submit or provider */}
       {(submitError || error) && (
         <p style={{ color: "crimson", marginTop: 8 }}>{submitError || error}</p>
       )}

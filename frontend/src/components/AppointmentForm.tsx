@@ -3,58 +3,45 @@ import { useAppointments } from "../hooks/useAppointments";
 import { doctors } from "../data/doctors";
 import type { Appointment } from "../types";
 
+/** Props for AppointmentForm. */
 type Props = {
+  /** The appointment selected in parent (null when creating). */
   selectedAppointment: Appointment | null;
+  /**
+   * Optional setter from parent to clear selection after submit/reset.
+   * If not provided, the form still works independently.
+   */
   setSelectedAppointment?: (a: Appointment | null) => void;
 };
 
 /**
- * AppointmentForm component allows users to book a new appointment
- * or update an existing one. It provides dynamic doctor availability
- * and form validation.
+ * AppointmentForm component.
+ *
+ * Renders a controlled form for creating appointments. When `selectedAppointment`
+ * is provided (from parent), fields are pre-populated for a better edit-like UX,
+ * but actual UPDATE calls should be done in `EditAppointmentForm` (this form
+ * only triggers CREATE via context's `addAppointment`).
  */
 export const AppointmentForm: React.FC<Props> = ({
   selectedAppointment,
   setSelectedAppointment,
 }) => {
+  // Context actions/state
   const { addAppointment, getAvailableSlots, loading, error } =
     useAppointments();
 
-  // Form state variables
-  const [name, setName] = useState("");
+  // --- Controlled form state ---
+  const [name, setName] = useState<string>("");
   const [doctorName, setDoctorName] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState<string>("");
   const [doctorId, setDoctorId] = useState<string | undefined>(undefined);
-  const [slot, setSlot] = useState("");
-  const [purpose, setPurpose] = useState("");
+  const [slot, setSlot] = useState<string>("");
+  const [purpose, setPurpose] = useState<string>("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   /**
-   * useEffect to update available slots when doctor or date changes.
-   * Also includes selected slot if editing an appointment.
-   */
-  // useEffect(() => {
-  //   if (doctorId && date) {
-  //     const slots = getAvailableSlots(doctorId, date);
-
-  //     // When editing, re-add the current slot to the list
-  //     if (
-  //       selectedAppointment?.slot &&
-  //       selectedAppointment.doctorId === doctorId &&
-  //       selectedAppointment.date === date
-  //     ) {
-  //       slots.push(selectedAppointment.slot);
-  //       slots.sort();
-  //     }
-
-  //     setAvailableSlots(slots);
-  //   } else {
-  //     setAvailableSlots([]);
-  //   }
-  // }, [doctorId, date, selectedAppointment]);
-
-  /**
-   * useEffect to populate form fields when an appointment is selected for editing.
+   * Populate fields when parent provides a `selectedAppointment`
+   * (e.g., when user clicks "Edit"). When cleared, reset to empty.
    */
   useEffect(() => {
     if (selectedAppointment) {
@@ -65,6 +52,7 @@ export const AppointmentForm: React.FC<Props> = ({
       setSlot(selectedAppointment.slot);
       setPurpose(selectedAppointment.purpose);
     } else {
+      // Reset for create mode
       setName("");
       setDoctorName("");
       setDoctorId(undefined);
@@ -74,12 +62,22 @@ export const AppointmentForm: React.FC<Props> = ({
     }
   }, [selectedAppointment]);
 
-  const baseSlots = useMemo(
+  /**
+   * Base available slots for the current (doctorName, date) pair.
+   * - Returns [] until both doctor and date are chosen (UX rule).
+   * - Excludes already-booked slots for the same doctor & date.
+   */
+  const baseSlots = useMemo<string[]>(
     () => (doctorName && date ? getAvailableSlots(doctorName, date) : []),
     [doctorName, date, getAvailableSlots]
   );
 
-  const slotsToShow = useMemo(() => {
+  /**
+   * Slots to show in the dropdown.
+   * - Keeps the currently selected slot (during edit prefill) even if it’s
+   *   otherwise filtered out by availability (ensures it remains visible).
+   */
+  const slotsToShow = useMemo<string[]>(() => {
     let list = baseSlots;
     if (
       selectedAppointment &&
@@ -108,17 +106,24 @@ export const AppointmentForm: React.FC<Props> = ({
     }
   };
 
-  const isValid =
+  /** Simple required-fields check for button enable + submit guard. */
+  const isValid: boolean = Boolean(
     name.trim() &&
-    doctorName.trim() &&
-    date.trim() &&
-    slot.trim() &&
-    purpose.trim();
+      doctorName.trim() &&
+      date.trim() &&
+      slot.trim() &&
+      purpose.trim()
+  );
 
-  // --- CREATE via API on button click ---
+  /**
+   * Click handler for the primary CTA.
+   * Calls context `addAppointment` (POST /api/appointments) and resets on success.
+   *
+   * @param e - Button click event
+   */
   const handleBookAppointment = async (
     e: React.MouseEvent<HTMLButtonElement>
-  ) => {
+  ): Promise<void> => {
     e.preventDefault();
     setSubmitError(null);
 
@@ -144,40 +149,11 @@ export const AppointmentForm: React.FC<Props> = ({
     }
   };
 
-  /**
-   * Handles form submission for both creating and updating an appointment.
-   *
-   * @param e - React form event
-   */
-  // const handleSubmit = (e: React.FormEvent) => {
-  //   e.preventDefault();
-
-  //   const doctor = doctors.find((d) => d.id === doctorId);
-  //   if (!doctor) return;
-
-  //   const appointment = {
-  //     id: selectedAppointment ? selectedAppointment.id : generateId(),
-  //     name,
-  //     date,
-  //     doctorId,
-  //     doctorName: doctor.name,
-  //     slot,
-  //     purpose,
-  //   };
-
-  //   if (selectedAppointment) {
-  //     updateAppointment(appointment);
-  //   } else {
-  //     addAppointment(appointment);
-  //   }
-
-  //   resetForm();
-  // };
-
   return (
     <form className="form-container">
       <h3>📝 Appointment Form</h3>
 
+      {/* Patient name */}
       <label>
         Name:
         <input
@@ -187,6 +163,7 @@ export const AppointmentForm: React.FC<Props> = ({
         />
       </label>
 
+      {/* Appointment date */}
       <label>
         Date:
         <input
@@ -197,18 +174,19 @@ export const AppointmentForm: React.FC<Props> = ({
         />
       </label>
 
+      {/* Doctor select:
+          - Keeps doctorId + doctorName in sync
+          - Resets slot when doctor changes to respect availability rules */}
       <label>
         Doctor:
         <select
-          // value={doctorId}
           value={doctorId ?? ""}
-          // onChange={(e) => setDoctorId(e.target.value)}
           onChange={(e) => {
             const id = e.target.value;
             const doc = doctors.find((d) => d.id === id);
             setDoctorId(id || undefined);
             setDoctorName(doc?.name ?? "");
-            setSlot(""); // reset slot when doctor changes (preserves your UX)
+            setSlot(""); // reset previously chosen slot when doctor changes
           }}
           required
         >
@@ -221,14 +199,12 @@ export const AppointmentForm: React.FC<Props> = ({
         </select>
       </label>
 
+      {/* Slot select:
+          - Disabled list until both doctor & date are chosen (via slotsToShow being [])
+          - Shows current slot (when editing) even if otherwise unavailable */}
       <label>
         Slot:
-        <select
-          value={slot}
-          onChange={(e) => setSlot(e.target.value)}
-          required
-          // disabled={!doctorId || !date}
-        >
+        <select value={slot} onChange={(e) => setSlot(e.target.value)} required>
           <option value="">-- Select Doctor & Date First --</option>
           {slotsToShow.map((s) => (
             <option key={s} value={s}>
@@ -238,6 +214,7 @@ export const AppointmentForm: React.FC<Props> = ({
         </select>
       </label>
 
+      {/* Purpose / notes */}
       <label>
         Purpose:
         <textarea
@@ -247,16 +224,12 @@ export const AppointmentForm: React.FC<Props> = ({
         />
       </label>
 
+      {/* Inline error from submit or provider */}
       {(submitError || error) && (
         <p style={{ color: "crimson", marginTop: 8 }}>{submitError || error}</p>
       )}
 
-      <button
-        type="button"
-        onClick={handleBookAppointment}
-        // disabled={loading || !isValid}
-      >
-        {/* {selectedAppointment ? "Update Appointment" : "Book Appointment"} */}
+      <button type="button" onClick={handleBookAppointment}>
         {loading ? "Booking…" : "Book Appointment"}
       </button>
     </form>
