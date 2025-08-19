@@ -1,10 +1,19 @@
-FROM node:20.19.3
-# Set the working directory inside container
+# --- Build Stage ---
+FROM node:20.19.3 AS build
 WORKDIR /app
-# Copy package files and install dependencies in /app
 COPY package*.json ./
 RUN npm install
-# Copy the rest of the source code into /app
 COPY . .
-EXPOSE 8081
-CMD [ "npm", "run", "dev" ]
+RUN npm run build
+    
+# --- Runtime stage ---
+FROM node:20.19.3 AS runtime
+WORKDIR /app
+RUN npm i -g pm2
+COPY --from=build /app/package*.json ./
+RUN npm ci --omit=dev
+COPY --from=build /app/dist ./dist
+ENV NODE_ENV=production
+ENV PORT=3000
+EXPOSE 3000
+CMD ["pm2-runtime", "npm", "--", "start"]

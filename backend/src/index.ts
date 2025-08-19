@@ -22,8 +22,8 @@ app.use(
   })
 );
 
-// Define the server port from environment or fallback to 8081
-const PORT = process.env.PORT || 8081;
+// Define the server port from environment or fallback to 3000
+const PORT = process.env.PORT || 3000;
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
