@@ -27,6 +27,20 @@ services:
     networks:
       - mern
 
+  mongodb:
+    image: mongo:latest
+    container_name: appointment--mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_URI=mongodb://vernikag:VernikaG%404@mongo:27017/appointments?authSource=appointments&directConnection=true
+    volumes:
+      - mongo-data:/data/db
+
 networks:
   mern:
     driver: bridge
+
+volumes:
+  mongo-data: {}
