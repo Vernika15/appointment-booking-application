@@ -5,6 +5,7 @@ services:
       context: .
       dockerfile: ./frontend/Dockerfile.frontend
     container_name: appointment-frontend
+    restart: always
     ports:
       - "80:80"
     depends_on:
@@ -18,10 +19,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile.backend
     container_name: appointment-backend
+    restart: always
     env_file:
       - ./backend/.env
     ports:
-      - "8081:8081"
+      - "3000:3000"
     networks:
       - mern
 
